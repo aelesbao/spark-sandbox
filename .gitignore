@@ -1,0 +1,3 @@
+# Apache Spark files
+/metastore_db
+derby.log
