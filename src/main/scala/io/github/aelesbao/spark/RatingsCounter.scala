@@ -1,11 +1,8 @@
 package io.github.aelesbao.spark
 
-import com.typesafe.scalalogging.Logger
 import org.apache.spark.SparkContext
 
 object RatingsCounter {
-  val logger = Logger(getClass)
-
   def main(args: Array[String]) {
     // Create a SparkContext using every core of the local machine, named RatingsCounter
     val sc = new SparkContext("local[*]", "RatingsCounter")
@@ -30,10 +27,10 @@ object RatingsCounter {
     // Print each result on its own line.
     sortedResults.foreach(println)
   }
-}
 
-class SimpleCSVHeader(header: Array[String]) extends Serializable {
-  val index = header.zipWithIndex.toMap
+  class SimpleCSVHeader(header: Array[String]) extends Serializable {
+    val index = header.zipWithIndex.toMap
 
-  def apply(array: Array[String], key: String): String = array(index(key))
+    def apply(array: Array[String], key: String): String = array(index(key))
+  }
 }
