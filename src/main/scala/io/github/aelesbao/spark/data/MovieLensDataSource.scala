@@ -11,8 +11,7 @@ class MovieLensDataSource(sc: SparkContext, dataSourceName: String) extends Seri
     .getResource(s"/ml-latest-small/${dataSourceName}.csv")
     .getPath()
 
-  val rdd = sc.textFile(resourcePath)
-    .map(line => line.split(","))
+  val rdd = sc.textFile(resourcePath).map(toCsvLines)
 
   private val headerLine = rdd.take(1)(0)
   private val headerIndex = headerLine.zipWithIndex.toMap
@@ -24,4 +23,9 @@ class MovieLensDataSource(sc: SparkContext, dataSourceName: String) extends Seri
 
   def map[R: ClassTag](f: ((String) => String) => R): RDD[R] =
     data.map(row => f.apply(header(row, _: String)))
+
+  private def toCsvLines(line: String) =
+    line
+      .split(",(?=([^\\\"]*\\\"[^\\\"]*\\\")*[^\\\"]*$)")
+      .map(cell => cell.replace("\"", ""))
 }
