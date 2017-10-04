@@ -7,14 +7,20 @@ object PopularMovies {
   def main(args: Array[String]) {
     val sc = new SparkContext("local[*]", getClass.getName)
 
-    val data = new MovieLensDataSource(sc, "ratings")
-    val moviesRatings = data.map(row => (row("movieId"), 1))
+    val ratingsPerMovie = new MovieLensDataSource(sc, "ratings")
+      .map(row => (row("movieId"), 1))
+      .reduceByKey((x, y) => x + y)
 
-    val movieCounts = moviesRatings.reduceByKey((x, y) => x + y)
-    val flippedResults = movieCounts.map(x => (x._2, x._1))
-    val sortedResults = flippedResults.sortByKey(false)
+    val movies = new MovieLensDataSource(sc, "movies")
+      .map(row => (row("movieId"), row("title")))
 
-    sortedResults.take(10).foreach(println)
+    val results = ratingsPerMovie
+      .join(movies)
+      .map(_._2)
+      .sortBy(x => x._1, false)
+      .map(x => f"${x._1}%5d | ${x._2}")
+
+    results.take(10).foreach(println)
   }
 
 }
