@@ -8,7 +8,7 @@ object RatingsCounter {
     val sc = new SparkContext("local[*]", getClass.getName)
 
     val data = new MovieLensDataSource(sc, "ratings")
-    val ratings = data(_("rating"))
+    val ratings = data.map(_("rating"))
 
     val sortedResults = ratings
       .countByValue()

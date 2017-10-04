@@ -8,7 +8,7 @@ object PopularMovies {
     val sc = new SparkContext("local[*]", getClass.getName)
 
     val data = new MovieLensDataSource(sc, "ratings")
-    val moviesRatings = data(row => (row("movieId"), 1))
+    val moviesRatings = data.map(row => (row("movieId"), 1))
 
     val movieCounts = moviesRatings.reduceByKey((x, y) => x + y)
     val flippedResults = movieCounts.map(x => (x._2, x._1))
