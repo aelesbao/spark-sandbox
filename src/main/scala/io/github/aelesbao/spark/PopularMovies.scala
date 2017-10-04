@@ -5,13 +5,13 @@ import org.apache.spark.SparkContext
 
 object PopularMovies {
   def main(args: Array[String]) {
-    val sc = new SparkContext("local[*]", getClass.getName)
+    implicit val sc = new SparkContext("local[*]", getClass.getName)
 
-    val ratingsPerMovie = new MovieLensDataSource(sc, "ratings")
+    val ratingsPerMovie = MovieLensDataSource("ratings")
       .map(row => (row("movieId"), 1))
       .reduceByKey((x, y) => x + y)
 
-    val movies = new MovieLensDataSource(sc, "movies")
+    val movies = MovieLensDataSource("movies")
       .map(row => (row("movieId"), row("title")))
 
     val results = ratingsPerMovie

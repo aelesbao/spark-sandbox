@@ -10,16 +10,16 @@ object MostPopularSuperHero {
 
   def main(args: Array[String]) {
 
-    val sc = new SparkContext("local[*]", getClass.getName)
+    implicit val sc = new SparkContext("local[*]", getClass.getName)
 
-    val mostPopular = new MarvelDataSource(sc, "marvel-graph")
+    val mostPopular = MarvelDataSource("marvel-graph")
       .map(row => (row(0).toInt, row.length - 1)) // Convert to (heroID, number of connections) RDD
       .reduceByKey((x, y) => x + y) // Combine entries that span more than one line
       .map(x => (x._2, x._1)) // Flip it to # of connections, hero ID
       .max() // Find the max # of connections
 
     // Look up the name (lookup returns an array of results, so we need to access the first result with (0)).
-    val mostPopularName = new MarvelDataSource(sc, "marvel-names").rdd
+    val mostPopularName = MarvelDataSource("marvel-names")
       .flatMap(parseNames)
       .lookup(mostPopular._2)(0)
 
