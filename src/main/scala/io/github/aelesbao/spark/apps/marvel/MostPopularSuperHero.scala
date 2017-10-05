@@ -1,4 +1,4 @@
-package io.github.aelesbao.spark
+package io.github.aelesbao.spark.apps.marvel
 
 import io.github.aelesbao.spark.data.MarvelDataSource
 import org.apache.spark._

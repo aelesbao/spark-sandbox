@@ -1,4 +1,4 @@
-package io.github.aelesbao.spark
+package io.github.aelesbao.spark.apps
 
 import io.github.aelesbao.spark.data.CsvDataSource
 import org.apache.spark.SparkContext
