@@ -8,9 +8,16 @@ import org.apache.spark.util.LongAccumulator
 import scala.collection.mutable.ArrayBuffer
 
 object DegreesOfSeparation {
+  object Color {
+    sealed trait EnumVal
+    case object White extends EnumVal
+    case object Gray extends EnumVal
+    case object Black extends EnumVal
+  }
+
   // Some custom data types
   // BFSData contains an array of hero ID connections, the distance, and color.
-  type BFSData = (Array[Int], Int, String)
+  type BFSData = (Array[Int], Int, Color.EnumVal)
   // A BFSNode has a heroID and the BFSData associated with it.
   type BFSNode = (Int, BFSData)
 
@@ -70,12 +77,12 @@ object DegreesOfSeparation {
     }
 
     // Default distance and color is 9999 and white
-    var color: String = "WHITE"
+    var color: Color.EnumVal = Color.White
     var distance: Int = 9999
 
     // Unless this is the character we're starting from
     if (heroID == startCharacterID) {
-      color = "GRAY"
+      color = Color.Gray
       distance = 0
     }
 
@@ -90,7 +97,7 @@ object DegreesOfSeparation {
 
     val connections: Array[Int] = data._1
     val distance: Int = data._2
-    var color: String = data._3
+    var color: Color.EnumVal = data._3
 
     // This is called from flatMap, so we return an array
     // of potentially many BFSNodes to add to our new RDD
@@ -98,11 +105,11 @@ object DegreesOfSeparation {
 
     // Gray nodes are flagged for expansion, and create new
     // gray nodes for each connection
-    if (color == "GRAY") {
+    if (color == Color.Gray) {
       for (connection <- connections) {
         val newCharacterID = connection
         val newDistance = distance + 1
-        val newColor = "GRAY"
+        val newColor = Color.Gray
 
         // Have we stumbled across the character we're looking for?
         // If so increment our accumulator so the driver script knows.
@@ -118,7 +125,7 @@ object DegreesOfSeparation {
       }
 
       // Color this node as black, indicating it has been processed already.
-      color = "BLACK"
+      color = Color.Black
     }
 
     // Add the original node back in, so its connections can get merged with
@@ -136,12 +143,12 @@ object DegreesOfSeparation {
     val edges2: Array[Int] = data2._1
     val distance1: Int = data1._2
     val distance2: Int = data2._2
-    val color1: String = data1._3
-    val color2: String = data2._3
+    val color1: Color.EnumVal = data1._3
+    val color2: Color.EnumVal = data2._3
 
     // Default node values
     var distance: Int = 9999
-    var color: String = "WHITE"
+    var color: Color.EnumVal = Color.White
     var edges: ArrayBuffer[Int] = ArrayBuffer()
 
     // See if one is the original node with its connections.
@@ -162,16 +169,16 @@ object DegreesOfSeparation {
     }
 
     // Preserve darkest color
-    if (color1 == "WHITE" && (color2 == "GRAY" || color2 == "BLACK")) {
+    if (color1 == Color.White && (color2 == Color.Gray || color2 == Color.Black)) {
       color = color2
     }
-    if (color1 == "GRAY" && color2 == "BLACK") {
+    if (color1 == Color.Gray && color2 == Color.Black) {
       color = color2
     }
-    if (color2 == "WHITE" && (color1 == "GRAY" || color1 == "BLACK")) {
+    if (color2 == Color.White && (color1 == Color.Gray || color1 == Color.Black)) {
       color = color1
     }
-    if (color2 == "GRAY" && color1 == "BLACK") {
+    if (color2 == Color.Gray && color1 == Color.Black) {
       color = color1
     }
 
