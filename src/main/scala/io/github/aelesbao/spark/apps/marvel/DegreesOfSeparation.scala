@@ -3,137 +3,138 @@ package io.github.aelesbao.spark.apps.marvel
 import com.typesafe.scalalogging.Logger
 import io.github.aelesbao.spark.data.MarvelDataSource
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 
 import scala.collection.mutable.ArrayBuffer
 
 object DegreesOfSeparation {
-  object Color {
-    sealed trait EnumVal
-    case object White extends EnumVal
-    case object Gray extends EnumVal
-    case object Black extends EnumVal
-  }
-
   // Some custom data types
   // BFSData contains an array of hero ID connections, the distance, and color.
   type BFSData = (Array[Int], Int, Color.EnumVal)
   // A BFSNode has a heroID and the BFSData associated with it.
   type BFSNode = (Int, BFSData)
 
-  // The characters we want to find the separation between.
-  val startCharacterID = 5013
-  val targetCharacterID = 14
-
-  // We make our accumulator a "global" Option so we can reference it in a mapper later.
-  var hitCounter: Option[LongAccumulator] = None
+  private val log = Logger(getClass)
 
   implicit lazy val sc = new SparkContext("local[*]", getClass.getName)
 
-  private val log = Logger(getClass)
-
   def main(args: Array[String]): Unit = {
+    // The characters we want to find the separation between.
+    val (startCharacterID, targetCharacterID) = if (args.length == 2) (args(0).toInt, args(1).toInt) else (5306, 173)
+    val (startCharacter, targetCharacter) = characterNames(startCharacterID, targetCharacterID)
+    val degrees = calculateDegreesOfDistance(startCharacterID, targetCharacterID)
+
+    println(s"There are $degrees degrees of separation between $startCharacter and $targetCharacter")
+  }
+
+  def characterNames(startCharacterID: Int, targetCharacterID: Int): (String, String) = {
+    val names = MarvelDataSource("marvel-names")
+      .flatMap(parseNames)
+
+    val startCharacter = names.lookup(startCharacterID)(0)
+    val targetCharacter = names.lookup(targetCharacterID)(0)
+
+    (startCharacter, targetCharacter)
+  }
+
+  def parseNames(row: Array[String]): Option[(Int, String)] = {
+    if (row.length > 1) Some(row(0).trim().toInt, row(1)) else None
+  }
+
+  def calculateDegreesOfDistance(startCharacterID: Int, targetCharacterID: Int): Int = {
     // Our accumulator, used to signal when we find the target
     // character in our BFS traversal.
-    hitCounter = Some(sc.longAccumulator("Hit Counter"))
+    val hitCounter = sc.longAccumulator("Hit Counter")
 
-    var iterationRdd = MarvelDataSource("marvel-graph").map(convertToBFS)
-
-    for (iteration <- 1 to 10) {
+    def loop(iteration: Int, iterationRdd: RDD[BFSNode]): Int = {
       log.info(s"Running BFS Iteration# $iteration")
 
       // Create new vertices as needed to darken or reduce distances in the
       // reduce stage. If we encounter the node we're looking for as a GRAY
       // node, increment our accumulator to signal that we're done.
-      val mapped = iterationRdd.flatMap(bfsMap)
+      val mapped = iterationRdd.flatMap(bfsMap(targetCharacterID, hitCounter))
 
       // Note that mapped.count() action here forces the RDD to be evaluated, and
       // that's the only reason our accumulator is actually updated.
       log.info(s"Processing ${mapped.count()} values.")
 
-      if (hitCounter.isDefined) {
-        val hitCount = hitCounter.get.value
-        if (hitCount > 0) {
-          println(s"Hit the target character! From ${hitCount} different direction(s).")
-          return
-        }
+      if (hitCounter.value > 0) {
+        log.info(s"Hit the target character! From ${hitCounter.value} different direction(s).")
+        iteration
+      } else if (iteration < 10) {
+        // Reducer combines data for each character ID, preserving the darkest
+        // color and shortest path.
+        loop(iteration + 1, mapped.reduceByKey(bfsReduce))
+      } else {
+        Int.MaxValue
       }
-
-      // Reducer combines data for each character ID, preserving the darkest
-      // color and shortest path.
-      iterationRdd = mapped.reduceByKey(bfsReduce)
     }
+
+    val iterationRdd = MarvelDataSource("marvel-graph")
+      .map(convertToBFS(startCharacterID))
+
+    loop(1, iterationRdd)
   }
 
   /** Converts a line of raw input into a BFSNode */
-  def convertToBFS(fields: Array[String]): BFSNode = {
+  def convertToBFS(startCharacterID: Int)(fields: Array[String]): BFSNode = {
     // Extract this hero ID from the first field
     val heroID = fields(0).toInt
 
     // Extract subsequent hero ID's into the connections array
-    var connections: ArrayBuffer[Int] = ArrayBuffer()
-    for (connection <- 1 to (fields.length - 1)) {
-      connections += fields(connection).toInt
-    }
+    val connections = (1 to (fields.length - 1))
+      .map(fields(_).toInt)
 
-    // Default distance and color is 9999 and white
-    var color: Color.EnumVal = Color.White
-    var distance: Int = 9999
+    // Unless this is the character we're starting from,
+    // use default distance and color is Int.MaxValue and white
+    val (color, distance) = if (heroID == startCharacterID) (Color.Gray, 0) else (Color.White, Int.MaxValue)
 
-    // Unless this is the character we're starting from
-    if (heroID == startCharacterID) {
-      color = Color.Gray
-      distance = 0
-    }
-
-    return (heroID, (connections.toArray, distance, color))
+    (heroID, (connections.toArray, distance, color))
   }
 
   /** Expands a BFSNode into this node and its children */
-  def bfsMap(node: BFSNode): Array[BFSNode] = {
+  def bfsMap(targetCharacterID: Int, hitCounter: LongAccumulator)(node: BFSNode): Array[BFSNode] = {
     // Extract data from the BFSNode
     val characterID: Int = node._1
     val data: BFSData = node._2
 
     val connections: Array[Int] = data._1
     val distance: Int = data._2
-    var color: Color.EnumVal = data._3
-
-    // This is called from flatMap, so we return an array
-    // of potentially many BFSNodes to add to our new RDD
-    var results: ArrayBuffer[BFSNode] = ArrayBuffer()
+    val color: Color.EnumVal = data._3
 
     // Gray nodes are flagged for expansion, and create new
     // gray nodes for each connection
     if (color == Color.Gray) {
-      for (connection <- connections) {
-        val newCharacterID = connection
-        val newDistance = distance + 1
-        val newColor = Color.Gray
-
-        // Have we stumbled across the character we're looking for?
-        // If so increment our accumulator so the driver script knows.
-        if (targetCharacterID == connection) {
-          if (hitCounter.isDefined) {
-            hitCounter.get.add(1)
-          }
-        }
-
-        // Create our new Gray node for this connection and add it to the results
-        val newEntry: BFSNode = (newCharacterID, (Array(), newDistance, newColor))
-        results += newEntry
-      }
-
       // Color this node as black, indicating it has been processed already.
-      color = Color.Black
+      val thisEntry: BFSNode = (characterID, (connections, distance, Color.Black))
+
+      // This is called from flatMap, so we return an array
+      // of potentially many BFSNodes to add to our new RDD
+      val results: Array[BFSNode] = connections
+        .map(connection => {
+          val newCharacterID = connection
+          val newDistance = distance + 1
+          val newColor = Color.Gray
+
+          // Have we stumbled across the character we're looking for?
+          // If so increment our accumulator so the driver script knows.
+          if (targetCharacterID == connection) {
+            hitCounter.add(1)
+          }
+
+          // Create our new Gray node for this connection and add it to the results
+          (newCharacterID, (Array[Int](), newDistance, newColor))
+        })
+
+      // Add the original node back in, so its connections can get merged with
+      // the gray nodes in the reducer.
+      results :+ thisEntry
     }
-
-    // Add the original node back in, so its connections can get merged with
-    // the gray nodes in the reducer.
-    val thisEntry: BFSNode = (characterID, (connections, distance, color))
-    results += thisEntry
-
-    return results.toArray
+    else {
+      val thisEntry: BFSNode = (characterID, (connections, distance, color))
+      Array(thisEntry)
+    }
   }
 
   /** Combine nodes for the same heroID, preserving the shortest length and darkest color. */
@@ -147,7 +148,7 @@ object DegreesOfSeparation {
     val color2: Color.EnumVal = data2._3
 
     // Default node values
-    var distance: Int = 9999
+    var distance: Int = Int.MaxValue
     var color: Color.EnumVal = Color.White
     var edges: ArrayBuffer[Int] = ArrayBuffer()
 
@@ -184,4 +185,17 @@ object DegreesOfSeparation {
 
     return (edges.toArray, distance, color)
   }
+
+  object Color {
+
+    sealed trait EnumVal
+
+    case object White extends EnumVal
+
+    case object Gray extends EnumVal
+
+    case object Black extends EnumVal
+
+  }
+
 }
