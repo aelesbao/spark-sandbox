@@ -6,7 +6,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 
-import scala.collection.mutable.ArrayBuffer
+import scala.math.min
 
 object DegreesOfSeparation {
   // Some custom data types
@@ -103,12 +103,11 @@ object DegreesOfSeparation {
     val distance: Int = data._2
     val color: Color.EnumVal = data._3
 
+    def thisEntry(newColor: Color.EnumVal): BFSNode = (characterID, (connections, distance, newColor))
+
     // Gray nodes are flagged for expansion, and create new
     // gray nodes for each connection
     if (color == Color.Gray) {
-      // Color this node as black, indicating it has been processed already.
-      val thisEntry: BFSNode = (characterID, (connections, distance, Color.Black))
-
       // This is called from flatMap, so we return an array
       // of potentially many BFSNodes to add to our new RDD
       val results: Array[BFSNode] = connections
@@ -129,11 +128,11 @@ object DegreesOfSeparation {
 
       // Add the original node back in, so its connections can get merged with
       // the gray nodes in the reducer.
-      results :+ thisEntry
+      // Color this node as black, indicating it has been processed already.
+      results :+ thisEntry(Color.Black)
     }
     else {
-      val thisEntry: BFSNode = (characterID, (connections, distance, color))
-      Array(thisEntry)
+      Array(thisEntry(color))
     }
   }
 
@@ -147,46 +146,16 @@ object DegreesOfSeparation {
     val color1: Color.EnumVal = data1._3
     val color2: Color.EnumVal = data2._3
 
-    // Default node values
-    var distance: Int = Int.MaxValue
-    var color: Color.EnumVal = Color.White
-    var edges: ArrayBuffer[Int] = ArrayBuffer()
+    val edges = edges1 ++ edges2 // Preserve original node with its connections
+    val distance = Array(distance1, distance2).fold(Int.MaxValue)(min) // Preserve minimum distance
+    val color = Array(color1, color2).sortBy(Color.all.indexOf(_)).head // Preserve darkest color
 
-    // See if one is the original node with its connections.
-    // If so preserve them.
-    if (edges1.length > 0) {
-      edges ++= edges1
-    }
-    if (edges2.length > 0) {
-      edges ++= edges2
-    }
-
-    // Preserve minimum distance
-    if (distance1 < distance) {
-      distance = distance1
-    }
-    if (distance2 < distance) {
-      distance = distance2
-    }
-
-    // Preserve darkest color
-    if (color1 == Color.White && (color2 == Color.Gray || color2 == Color.Black)) {
-      color = color2
-    }
-    if (color1 == Color.Gray && color2 == Color.Black) {
-      color = color2
-    }
-    if (color2 == Color.White && (color1 == Color.Gray || color1 == Color.Black)) {
-      color = color1
-    }
-    if (color2 == Color.Gray && color1 == Color.Black) {
-      color = color1
-    }
-
-    return (edges.toArray, distance, color)
+    return (edges, distance, color)
   }
 
   object Color {
+
+    val all = Array(Black, Gray, White)
 
     sealed trait EnumVal
 
@@ -195,7 +164,6 @@ object DegreesOfSeparation {
     case object Gray extends EnumVal
 
     case object Black extends EnumVal
-
   }
 
 }
