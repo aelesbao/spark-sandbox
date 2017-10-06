@@ -1,10 +1,19 @@
 package io.github.aelesbao.spark.data
 
+import java.nio.charset.CodingErrorAction
+
 import com.typesafe.scalalogging.Logger
 import org.apache.spark.SparkContext
 
+import scala.io.Codec
+
 object CsvDataSource {
   private val log = Logger(getClass)
+
+  // Handle character encoding issues
+  implicit val codec = Codec("UTF-8")
+  codec.onMalformedInput(CodingErrorAction.REPLACE)
+  codec.onUnmappableCharacter(CodingErrorAction.REPLACE)
 
   def apply(dataSourcePath: String)(
     implicit sc: SparkContext,
