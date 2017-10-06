@@ -4,6 +4,7 @@ import java.nio.charset.CodingErrorAction
 
 import com.typesafe.scalalogging.Logger
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 
 import scala.io.Codec
 
@@ -18,7 +19,7 @@ object CsvDataSource {
   def apply(dataSourcePath: String)(
     implicit sc: SparkContext,
     parseCsvLine: String => Array[String]
-  ) = {
+  ): RDD[Array[String]] = {
     log.debug(s"Loading data source '${dataSourcePath}' from resource path")
 
     val resource = getClass().getResource(dataSourcePath)
@@ -29,16 +30,12 @@ object CsvDataSource {
 
     sc.textFile(resource.getPath()).map(parseCsvLine)
   }
-}
 
-object MovieLensDataSource {
-  implicit private def parseCsvLine(line: String): Array[String] =
-    line
-      .split(",(?=([^\\\"]*\\\"[^\\\"]*\\\")*[^\\\"]*$)")
-      .map(cell => cell.replace("\"", "").trim)
-
-  def apply(dataSourceName: String)(implicit sc: SparkContext) = {
-    val rdd = CsvDataSource(s"/ml-latest-small/${dataSourceName}.csv")
+  def withHeader(dataSourcePath: String)(
+    implicit sc: SparkContext,
+    parseCsvLine: String => Array[String]
+  ): RDD[Map[String, String]] = {
+    val rdd = apply(dataSourcePath)
 
     val headerLine = rdd.take(1)(0)
     val headerIndex = headerLine.zipWithIndex.toMap
@@ -55,14 +52,4 @@ object MovieLensDataSource {
       .filter(header(_, headerIndex.keys.head) != headerIndex.keys.head)
       .map(toMap)
   }
-}
-
-object MarvelDataSource {
-  implicit private def parseCsvLine(line: String): Array[String] =
-    line
-      .split("\\s+(?=([^\\\"]*\\\"[^\\\"]*\\\")*[^\\\"]*$)")
-      .map(cell => cell.replace("\"", "").trim)
-
-  def apply(dataSourceName: String)(implicit sc: SparkContext) =
-    CsvDataSource(s"/marvel/${dataSourceName}.txt")
 }
