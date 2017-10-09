@@ -35,33 +35,31 @@ object MovieSimilarities {
     val moviePairSimilarities = loadMoviePairSimilarities()
 
     // Extract similarities for the movie we care about that are "good".
-    if (args.length > 0) {
-      val movieID = args.lift(0).map(_.toInt).getOrElse(1)
-      val mainMovieTitle = movieTitle(movieID)
+    val movieID = args.lift(0).map(_.toInt).getOrElse(1)
+    val mainMovieTitle = movieTitle(movieID)
 
-      log.info(s"Calculating similarities for movie ${mainMovieTitle}")
+    log.info(s"Calculating similarities for movie ${mainMovieTitle}")
 
-      val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
-      val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
+    val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
+    val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
 
-      // Filter for movies with this sim that are "good" as defined by
-      // our quality thresholds above
-      val filteredResults = moviePairSimilarities.filter(x => {
-        val (pair, (score, strength)) = x
-        pair.productIterator.contains(movieID) &&
-          score > scoreThreshold && strength > coOccurrenceThreshold
-      })
+    // Filter for movies with this sim that are "good" as defined by
+    // our quality thresholds above
+    val filteredResults = moviePairSimilarities.filter(x => {
+      val (pair, (score, strength)) = x
+      pair.productIterator.contains(movieID) &&
+        score > scoreThreshold && strength > coOccurrenceThreshold
+    })
 
-      // Sort by quality score.
-      val results = filteredResults.map(_.swap).sortByKey(false).take(10)
+    // Sort by quality score.
+    val results = filteredResults.map(_.swap).sortByKey(false).take(10)
 
-      println(s"\nTop 10 similar movies for ${mainMovieTitle}")
-      for (result <- results) {
-        val ((score, strength), pair) = result
-        // Display the similarity result that isn't the movie we're looking at
-        val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
-        println(f"${movieTitle(similarMovieID)}%-30s\tscore: ${score}\tstrength: ${strength}")
-      }
+    println(s"\nTop 10 similar movies for ${mainMovieTitle}")
+    for (result <- results) {
+      val ((score, strength), pair) = result
+      // Display the similarity result that isn't the movie we're looking at
+      val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
+      println(f"${movieTitle(similarMovieID)}%-30s\tscore: ${score}\tstrength: ${strength}")
     }
   }
 
