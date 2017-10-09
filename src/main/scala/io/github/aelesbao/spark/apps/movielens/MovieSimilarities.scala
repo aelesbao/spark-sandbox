@@ -72,7 +72,7 @@ object MovieSimilarities {
       .map(row => (row("userId").toInt, (row("movieId").toInt, row("rating").toDouble)))
 
   def loadMoviePairSimilarities(): RDD[MoviePairRatingSimilarity] = {
-    val cacheFile = ".rdd-cache/movie-similarities"
+    val cacheFile = "data/movie-similarities"
     if (Path(cacheFile).exists)
       loadCachedMoviePairSimilarities(cacheFile)
     else {

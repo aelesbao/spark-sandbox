@@ -21,4 +21,4 @@ derby.log
 *.iml
 
 # Cached RDDs
-/.rdd-cache
+/data/movie-similarities

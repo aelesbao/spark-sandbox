@@ -21,14 +21,7 @@ object CsvDataSource {
     parseCsvLine: String => Array[String]
   ): RDD[Array[String]] = {
     log.debug(s"Loading data source '${dataSourcePath}' from resource path")
-
-    val resource = getClass().getResource(dataSourcePath)
-    if (resource == null) {
-      throw new IllegalArgumentException(
-        s"Could not find a data source on '${dataSourcePath}'")
-    }
-
-    sc.textFile(resource.getPath()).map(parseCsvLine)
+    sc.textFile(s"data/${dataSourcePath}").map(parseCsvLine)
   }
 
   def withHeader(dataSourcePath: String)(
