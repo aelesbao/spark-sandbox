@@ -94,7 +94,6 @@ object MovieSimilarities {
       .map(makePairs)
       .groupByKey()
       .mapValues(computeCosineSimilarity)
-      .sortByKey()
 
     log.debug(s"Caching movie similarities\n${moviePairSimilarities.toDebugString}")
     moviePairSimilarities.saveAsTextFile(cacheFile)
