@@ -47,21 +47,20 @@ object MovieSimilarities {
       // Filter for movies with this sim that are "good" as defined by
       // our quality thresholds above
       val filteredResults = moviePairSimilarities.filter(x => {
-        val pair = x._1
-        val sim = x._2
-        (pair._1 == movieID || pair._2 == movieID) && sim._1 > scoreThreshold && sim._2 > coOccurrenceThreshold
+        val (pair, (score, strength)) = x
+        pair.productIterator.contains(movieID) &&
+          score > scoreThreshold && strength > coOccurrenceThreshold
       })
 
       // Sort by quality score.
-      val results = filteredResults.map(x => (x._2, x._1)).sortByKey(false).take(10)
+      val results = filteredResults.map(_.swap).sortByKey(false).take(10)
 
       println(s"\nTop 10 similar movies for ${mainMovieTitle}")
       for (result <- results) {
-        val sim = result._1
-        val pair = result._2
+        val ((score, strength), pair) = result
         // Display the similarity result that isn't the movie we're looking at
         val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
-        println(f"${movieTitle(similarMovieID)}%-30s\tscore: ${sim._1}\tstrength: ${sim._2}")
+        println(f"${movieTitle(similarMovieID)}%-30s\tscore: ${score}\tstrength: ${strength}")
       }
     }
   }
@@ -106,31 +105,18 @@ object MovieSimilarities {
   }
 
   def filterDuplicates(userRatingPair: UserRatingPair) = {
-    val movieRating1 = userRatingPair._2._1
-    val movieRating2 = userRatingPair._2._2
-
-    val movie1 = movieRating1._1
-    val movie2 = movieRating2._1
-
+    val ((movie1, _), (movie2, _)) = userRatingPair._2
     movie1 < movie2
   }
 
   def makePairs(userRatingPair: UserRatingPair) = {
-    val movieRating1 = userRatingPair._2._1
-    val movieRating2 = userRatingPair._2._2
-
-    val movie1 = movieRating1._1
-    val rating1 = movieRating1._2
-    val movie2 = movieRating2._1
-    val rating2 = movieRating2._2
-
+    val ((movie1, rating1), (movie2, rating2)) = userRatingPair._2
     (movie1 -> movie2, rating1 -> rating2)
   }
 
   def computeCosineSimilarity(ratingPairs: RatingPairs): (Double, Int) = {
     val sum = ratingPairs.foldLeft((0.0, 0.0, 0.0)) { (sum, pair) =>
-      val ratingX = pair._1
-      val ratingY = pair._2
+      val (ratingX, ratingY) = pair
 
       val sum_xx = sum._1 + (ratingX * ratingX)
       val sum_yy = sum._2 + (ratingY * ratingY)
