@@ -1,10 +1,7 @@
 package io.github.aelesbao.spark.apps.movielens
 
-import java.time.LocalDate
-
 import com.typesafe.scalalogging.Logger
 import io.github.aelesbao.spark.data.MovieLensDataSource
-import org.apache.hadoop.mapred.JobConf
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
@@ -33,14 +30,19 @@ object MovieSimilarities {
 
   def main(args: Array[String]): Unit = {
     val movies = loadMovies()
+    def movieTitle = movies.lookup(_: Int)(0)
+
     val moviePairSimilarities = loadMoviePairSimilarities()
 
     // Extract similarities for the movie we care about that are "good".
-    if (args.length > 0 || true) {
-      val scoreThreshold = 0.97
-      val coOccurrenceThreshold = 50.0
+    if (args.length > 0) {
+      val movieID = args.lift(0).map(_.toInt).getOrElse(1)
+      val mainMovieTitle = movieTitle(movieID)
 
-      val movieID:Int = 1 //args(0).toInt
+      log.info(s"Calculating similarities for movie ${mainMovieTitle}")
+
+      val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
+      val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
 
       // Filter for movies with this sim that are "good" as defined by
       // our quality thresholds above
@@ -53,15 +55,13 @@ object MovieSimilarities {
       // Sort by quality score.
       val results = filteredResults.map(x => (x._2, x._1)).sortByKey(false).take(10)
 
-      def movieTitle(id: Int): String = movies.lookup(movieID)(0)
-
-      println("\nTop 10 similar movies for " + movieTitle(movieID))
+      println(s"\nTop 10 similar movies for ${mainMovieTitle}")
       for (result <- results) {
         val sim = result._1
         val pair = result._2
         // Display the similarity result that isn't the movie we're looking at
         val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
-        println(movieTitle(similarMovieID) + "\tscore: " + sim._1 + "\tstrength: " + sim._2)
+        println(f"${movieTitle(similarMovieID)}%-30s\tscore: ${sim._1}\tstrength: ${sim._2}")
       }
     }
   }
@@ -75,23 +75,20 @@ object MovieSimilarities {
       .map(row => (row("userId").toInt, (row("movieId").toInt, row("rating").toDouble)))
 
   def loadMoviePairSimilarities(): RDD[MoviePairRatingSimilarity] = {
-//    val cacheFile = "movie-similarities"
-//    if (Path(cacheFile).exists)
-//      loadCachedMoviePairSimilarities(cacheFile)
-//    else {
-      val moviePairSimilarities = analyseMoviePairSimilarities()
-//      moviePairSimilarities.saveAsTextFile(cacheFile)
-      moviePairSimilarities
-//    }
+    val cacheFile = ".rdd-cache/movie-similarities"
+    if (Path(cacheFile).exists)
+      loadCachedMoviePairSimilarities(cacheFile)
+    else {
+      analyseMoviePairSimilarities(cacheFile)
+    }
   }
 
-  private def loadCachedMoviePairSimilarities(cacheFile: String) = {
+  private def loadCachedMoviePairSimilarities(cacheFile: String): RDD[MoviePairRatingSimilarity] = {
     log.info("Loading cached movie similarities")
-//    sc.textFile(cacheFile)
-//      .map(MoviePairRatingSimilarityParser.parse(MoviePairRatingSimilarityParser.data, _))
+    sc.textFile(cacheFile).map(MoviePairRatingSimilarity.apply)
   }
 
-  private def analyseMoviePairSimilarities() = {
+  private def analyseMoviePairSimilarities(cacheFile: String): RDD[MoviePairRatingSimilarity] = {
     log.info("Analysing movie similarities")
 
     val ratings = loadRatingsPerUser()
@@ -102,7 +99,8 @@ object MovieSimilarities {
       .mapValues(computeCosineSimilarity)
       .sortByKey()
 
-    log.debug(moviePairSimilarities.toDebugString)
+    log.debug(s"Caching movie similarities\n${moviePairSimilarities.toDebugString}")
+    moviePairSimilarities.saveAsTextFile(cacheFile)
 
     moviePairSimilarities.cache()
   }
@@ -149,14 +147,27 @@ object MovieSimilarities {
     score -> numPairs
   }
 
-  object MoviePairRatingSimilarityParser extends JavaTokenParsers {
-    override val skipWhitespace = false
+  object MoviePairRatingSimilarity {
+    def apply(line: String): MoviePairRatingSimilarity =
+      Parser.parse(Parser.data, line) match {
+        case Parser.Success(matched, _) => matched
+        case Parser.NoSuccess(msg, _) => scala.sys.error(msg)
+      }
 
-    def int = wholeNumber ^^ { _.toInt }
-    def decimal = decimalNumber ^^ { _.toDouble }
+    object Parser extends JavaTokenParsers {
+      override val skipWhitespace = false
 
-//    def moviePairTuple: Parser[MoviePair] = "(" ~> repsep(int ~ int, ",") <~ ")" ^^ { case a =>  }
-//    def ratingSimilarityTuple: Parser[RatingSimilarity] = "(" ~> repsep(decimal ~ int, ",") <~ ")" ^^ { case r ~ s => r -> s }
-//    def data: Parser[MoviePairRatingSimilarity] = "(" ~> repsep(moviePairTuple ~ ratingSimilarityTuple, ",") <~ ")" ^^ { case mp ~ rs => mp -> rs }
+      def int = wholeNumber ^^ { _.toInt }
+      def decimal = decimalNumber ^^ { _.toDouble }
+
+      def moviePairTuple: Parser[MoviePair] =
+        "(" ~> int ~ "," ~ int <~ ")" ^^ { case a ~ "," ~ b => a -> b }
+
+      def ratingSimilarityTuple: Parser[RatingSimilarity] =
+        "(" ~> decimal ~ "," ~ int <~ ")" ^^ { case r ~ "," ~ s => r -> s }
+
+      def data: Parser[MoviePairRatingSimilarity] =
+        phrase("(" ~> moviePairTuple ~ "," ~ ratingSimilarityTuple <~ ")") ^^ { case mp ~ "," ~ rs => mp -> rs }
+    }
   }
 }
