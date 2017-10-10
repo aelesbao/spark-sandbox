@@ -1,8 +1,8 @@
 package io.github.aelesbao.spark.apps.movielens
 
-import com.typesafe.scalalogging.Logger
 import io.github.aelesbao.spark.data.MovieLensDataSource
 import org.apache.spark.SparkContext
+import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.rdd.RDD
 
 import scala.math.sqrt
@@ -10,9 +10,7 @@ import scala.reflect.io.Path
 import scala.util.Try
 import scala.util.parsing.combinator.JavaTokenParsers
 
-object MovieSimilarities {
-
-  implicit lazy val sc = new SparkContext("local[*]", getClass.getName)
+object MovieSimilarities extends Logging {
 
   type Movie = (Int, String)
 
@@ -26,7 +24,6 @@ object MovieSimilarities {
   type RatingSimilarity = (Double, Int)
   type MoviePairRatingSimilarity = (MoviePair, RatingSimilarity)
 
-  private val log = Logger(getClass)
 
   def main(args: Array[String]): Unit = {
     val movies = loadMovies()
@@ -38,10 +35,11 @@ object MovieSimilarities {
     val movieID = args.lift(0).map(_.toInt).getOrElse(1)
     val mainMovieTitle = movieTitle(movieID)
 
-    log.info(s"Calculating similarities for movie ${mainMovieTitle}")
 
     val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
     val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
+
+    logger.info(s"Calculating similarities for movie ${mainMovieTitle}")
 
     // Filter for movies with this sim that are "good" as defined by
     // our quality thresholds above
@@ -81,12 +79,12 @@ object MovieSimilarities {
   }
 
   private def loadCachedMoviePairSimilarities(cacheFile: String): RDD[MoviePairRatingSimilarity] = {
-    log.info("Loading cached movie similarities")
+    logger.info("Loading cached movie similarities")
     sc.textFile(cacheFile).map(MoviePairRatingSimilarity.apply)
   }
 
   private def analyseMoviePairSimilarities(cacheFile: String): RDD[MoviePairRatingSimilarity] = {
-    log.info("Analysing movie similarities")
+    logger.info("Analysing movie similarities")
 
     val ratings = loadRatingsPerUser()
     val moviePairSimilarities = ratings.join(ratings)
@@ -95,7 +93,7 @@ object MovieSimilarities {
       .groupByKey()
       .mapValues(computeCosineSimilarity)
 
-    log.debug(s"Caching movie similarities\n${moviePairSimilarities.toDebugString}")
+    logger.debug(s"Caching movie similarities\n${moviePairSimilarities.toDebugString}")
     moviePairSimilarities.saveAsTextFile(cacheFile)
 
     moviePairSimilarities.cache()

@@ -1,21 +1,19 @@
 package io.github.aelesbao.spark.apps.marvel
 
-import com.typesafe.scalalogging.Logger
 import io.github.aelesbao.spark.data.MarvelDataSource
+import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 
 import scala.math.min
 
-object DegreesOfSeparation {
+object DegreesOfSeparation extends Logging {
   // Some custom data types
   // BFSData contains an array of hero ID connections, the distance, and color.
   type BFSData = (Array[Int], Int, Color.EnumVal)
   // A BFSNode has a heroID and the BFSData associated with it.
   type BFSNode = (Int, BFSData)
-
-  private val log = Logger(getClass)
 
   implicit lazy val sc = new SparkContext("local[*]", getClass.getName)
 
@@ -48,7 +46,7 @@ object DegreesOfSeparation {
     val hitCounter = sc.longAccumulator("Hit Counter")
 
     def loop(iteration: Int, iterationRdd: RDD[BFSNode]): Int = {
-      log.info(s"Running BFS Iteration# $iteration")
+      logger.info(s"Running BFS Iteration# $iteration")
 
       // Create new vertices as needed to darken or reduce distances in the
       // reduce stage. If we encounter the node we're looking for as a GRAY
@@ -57,10 +55,10 @@ object DegreesOfSeparation {
 
       // Note that mapped.count() action here forces the RDD to be evaluated, and
       // that's the only reason our accumulator is actually updated.
-      log.info(s"Processing ${mapped.count()} values.")
+      logger.info(s"Processing ${mapped.count()} values.")
 
       if (hitCounter.value > 0) {
-        log.info(s"Hit the target character! From ${hitCounter.value} different direction(s).")
+        logger.info(s"Hit the target character! From ${hitCounter.value} different direction(s).")
         iteration
       } else if (iteration < 10) {
         // Reducer combines data for each character ID, preserving the darkest

@@ -2,15 +2,13 @@ package io.github.aelesbao.spark.data
 
 import java.nio.charset.CodingErrorAction
 
-import com.typesafe.scalalogging.Logger
+import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import scala.io.Codec
 
-object CsvDataSource {
-  private val log = Logger(getClass)
-
+object CsvDataSource extends Logging {
   // Handle character encoding issues
   implicit val codec = Codec("UTF-8")
   codec.onMalformedInput(CodingErrorAction.REPLACE)
@@ -20,7 +18,7 @@ object CsvDataSource {
     implicit sc: SparkContext,
     parseCsvLine: String => Array[String]
   ): RDD[Array[String]] = {
-    log.debug(s"Loading data source '${dataSourcePath}' from resource path")
+    logger.debug(s"Loading data source '${dataSourcePath}' from resource path")
     sc.textFile(s"data/${dataSourcePath}").map(parseCsvLine)
   }
 
