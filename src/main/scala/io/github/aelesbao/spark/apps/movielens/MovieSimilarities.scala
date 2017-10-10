@@ -1,8 +1,8 @@
 package io.github.aelesbao.spark.apps.movielens
 
 import io.github.aelesbao.spark.data.MovieLensDataSource
-import org.apache.spark.SparkContext
 import org.apache.logging.log4j.scala.Logging
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 
 import scala.math.sqrt
@@ -10,7 +10,7 @@ import scala.reflect.io.Path
 import scala.util.Try
 import scala.util.parsing.combinator.JavaTokenParsers
 
-object MovieSimilarities extends Logging {
+object MovieSimilarities extends App with Logging {
 
   type Movie = (Int, String)
 
@@ -24,21 +24,25 @@ object MovieSimilarities extends Logging {
   type RatingSimilarity = (Double, Int)
   type MoviePairRatingSimilarity = (MoviePair, RatingSimilarity)
 
+  lazy val conf = new SparkConf()
+    .setAppName(getClass.getName)
 
-  def main(args: Array[String]): Unit = {
-    val movies = loadMovies()
-    def movieTitle = movies.lookup(_: Int)(0)
+  implicit lazy val sc = new SparkContext(conf)
 
-    val moviePairSimilarities = loadMoviePairSimilarities()
+  lazy val movies = loadMovies()
+  def movieTitle = movies.lookup(_: Int)(0)
 
-    // Extract similarities for the movie we care about that are "good".
-    val movieID = args.lift(0).map(_.toInt).getOrElse(1)
+  lazy val moviePairSimilarities = loadMoviePairSimilarities()
+
+  val movieID = args.lift(0).map(_.toInt).getOrElse(1)
+  val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
+  val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
+
+  calculateSimilarities()
+
+  // Extract similarities for the movie we care about that are "good".
+  private def calculateSimilarities() = {
     val mainMovieTitle = movieTitle(movieID)
-
-
-    val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
-    val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
-
     logger.info(s"Calculating similarities for movie ${mainMovieTitle}")
 
     // Filter for movies with this sim that are "good" as defined by
@@ -57,19 +61,19 @@ object MovieSimilarities extends Logging {
       val ((score, strength), pair) = result
       // Display the similarity result that isn't the movie we're looking at
       val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
-      println(f"${movieTitle(similarMovieID)}%-30s\tscore: ${score}\tstrength: ${strength}")
+      println(f"${similarMovieID}%5d ${movieTitle(similarMovieID)}%-40s    score: ${score * 100}%2f%%    strength: ${strength}")
     }
   }
 
-  def loadMovies(): RDD[Movie] =
+  private def loadMovies(): RDD[Movie] =
     MovieLensDataSource("movies")
       .map(row => (row("movieId").toInt, row("title")))
 
-  def loadRatingsPerUser(): RDD[(Int, MovieRating)] =
+  private def loadRatingsPerUser(): RDD[(Int, MovieRating)] =
     MovieLensDataSource("ratings")
       .map(row => (row("userId").toInt, (row("movieId").toInt, row("rating").toDouble)))
 
-  def loadMoviePairSimilarities(): RDD[MoviePairRatingSimilarity] = {
+  private def loadMoviePairSimilarities(): RDD[MoviePairRatingSimilarity] = {
     val cacheFile = "data/movie-similarities"
     if (Path(cacheFile).exists)
       loadCachedMoviePairSimilarities(cacheFile)
