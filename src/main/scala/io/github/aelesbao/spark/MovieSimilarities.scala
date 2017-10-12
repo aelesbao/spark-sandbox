@@ -1,9 +1,9 @@
-package io.github.aelesbao.spark.apps.movielens
+package io.github.aelesbao.spark
 
 import io.github.aelesbao.spark.data.MovieLensDataSource
 import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.math.sqrt
 import scala.reflect.io.Path

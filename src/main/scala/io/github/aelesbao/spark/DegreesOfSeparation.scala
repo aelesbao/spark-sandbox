@@ -1,4 +1,4 @@
-package io.github.aelesbao.spark.apps.marvel
+package io.github.aelesbao.spark
 
 import io.github.aelesbao.spark.data.MarvelDataSource
 import org.apache.logging.log4j.scala.Logging

@@ -1,4 +1,4 @@
-package io.github.aelesbao.spark.apps.movielens
+package io.github.aelesbao.spark
 
 import io.github.aelesbao.spark.data.MovieLensDataSource
 import org.apache.spark.SparkContext

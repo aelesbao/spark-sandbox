@@ -1,7 +1,7 @@
-package io.github.aelesbao.spark.apps
+package io.github.aelesbao.spark
 
 import io.github.aelesbao.spark.data.CsvDataSource
-import org.apache.spark.sql._
+import org.apache.spark.sql.SparkSession
 
 object SparkSQL extends App {
 
