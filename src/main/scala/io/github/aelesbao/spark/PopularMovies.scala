@@ -1,26 +1,39 @@
 package io.github.aelesbao.spark
 
-import io.github.aelesbao.spark.data.MovieLensDataSource
-import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 
-object PopularMovies {
-  def main(args: Array[String]) {
-    implicit val sc = new SparkContext("local[*]", getClass.getName)
+object PopularMovies extends App {
+  val spark = SparkSession.builder
+    .master("local[*]")
+    .appName(getClass.getName)
+    .getOrCreate()
 
-    val ratingsPerMovie = MovieLensDataSource("ratings")
-      .map(row => (row("movieId"), 1))
-      .reduceByKey((x, y) => x + y)
+  import spark.implicits._
 
-    val movies = MovieLensDataSource("movies")
-      .map(row => (row("movieId"), row("title")))
+  val ratings = loadDF("ratings")
+  val ratingsPerMovie = ratings.groupBy("movieId").count().cache()
+  ratingsPerMovie.printSchema()
 
-    val results = ratingsPerMovie
-      .join(movies)
-      .map(_._2)
-      .sortBy(x => x._1, false)
-      .map(x => f"${x._1}%5d | ${x._2}")
+  val movies = loadDF("movies").cache()
+  movies.printSchema()
 
-    results.take(10).foreach(println)
+  val results = ratingsPerMovie
+    .join(movies, "movieId")
+    .orderBy($"count".desc)
+    .cache()
+
+  results.printSchema()
+
+  println(f"   id | movie")
+  results
+    .map(row => f"${row.getAs("movieId")}%5d | ${row.getAs("title")}")
+    .take(10)
+    .foreach(println)
+
+  private def loadDF(dataSet: String) = {
+    spark.read
+      .option("header", "true") // Use first line of all files as header
+      .option("inferSchema", "true") // Automatically infer data types
+      .csv(s"data/ml-latest-small/${dataSet}.csv")
   }
-
 }

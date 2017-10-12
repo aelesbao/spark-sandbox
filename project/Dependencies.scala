@@ -3,8 +3,8 @@ import sbt._
 object Dependencies {
   lazy val sparkVersion = "2.2.0"
   lazy val sparkDeps = Seq(
-    "org.apache.spark" %% "spark-core" % sparkVersion % "provided" exclude("log4j", "log4j"),
-    "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
+    "org.apache.spark" %% "spark-core" % sparkVersion exclude("log4j", "log4j"),
+    "org.apache.spark" %% "spark-sql" % sparkVersion
   )
 
   lazy val log4jVersion = "2.9.1"
