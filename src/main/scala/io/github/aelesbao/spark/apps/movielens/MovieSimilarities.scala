@@ -2,8 +2,8 @@ package io.github.aelesbao.spark.apps.movielens
 
 import io.github.aelesbao.spark.data.MovieLensDataSource
 import org.apache.logging.log4j.scala.Logging
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 
 import scala.math.sqrt
 import scala.reflect.io.Path
@@ -32,38 +32,17 @@ object MovieSimilarities extends App with Logging {
   lazy val movies = loadMovies()
   def movieTitle = movies.lookup(_: Int)(0)
 
-  lazy val moviePairSimilarities = loadMoviePairSimilarities()
-
   val movieID = args.lift(0).map(_.toInt).getOrElse(1)
+  val mainMovieTitle = movieTitle(movieID)
+  logger.info(s"Calculating similarities for movie ${mainMovieTitle}")
+
   val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
   val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
 
-  calculateSimilarities()
+  val moviePairSimilarities = loadMoviePairSimilarities()
+  val results = filterResults(moviePairSimilarities, scoreThreshold, coOccurrenceThreshold)
 
-  // Extract similarities for the movie we care about that are "good".
-  private def calculateSimilarities() = {
-    val mainMovieTitle = movieTitle(movieID)
-    logger.info(s"Calculating similarities for movie ${mainMovieTitle}")
-
-    // Filter for movies with this sim that are "good" as defined by
-    // our quality thresholds above
-    val filteredResults = moviePairSimilarities.filter(x => {
-      val (pair, (score, strength)) = x
-      pair.productIterator.contains(movieID) &&
-        score > scoreThreshold && strength > coOccurrenceThreshold
-    })
-
-    // Sort by quality score.
-    val results = filteredResults.map(_.swap).sortByKey(false).take(10)
-
-    println(s"\nTop 10 similar movies for ${mainMovieTitle}")
-    for (result <- results) {
-      val ((score, strength), pair) = result
-      // Display the similarity result that isn't the movie we're looking at
-      val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
-      println(f"${similarMovieID}%5d ${movieTitle(similarMovieID)}%-40s    score: ${score * 100}%2f%%    strength: ${strength}")
-    }
-  }
+  printSimilarities(movieID, mainMovieTitle, results)
 
   private def loadMovies(): RDD[Movie] =
     MovieLensDataSource("movies")
@@ -94,6 +73,7 @@ object MovieSimilarities extends App with Logging {
     val moviePairSimilarities = ratings.join(ratings)
       .filter(filterDuplicates)
       .map(makePairs)
+      .partitionBy(new HashPartitioner(100))
       .groupByKey()
       .mapValues(computeCosineSimilarity)
 
@@ -130,6 +110,33 @@ object MovieSimilarities extends App with Logging {
     val numPairs: Int = ratingPairs.size
 
     score -> numPairs
+  }
+
+  def filterResults(
+    moviePairSimilarities: RDD[MoviePairRatingSimilarity],
+    scoreThreshold: Double,
+    coOccurrenceThreshold: Double
+  ): Array[(RatingSimilarity, MoviePair)] = {
+    // Filter for movies with this sim that are "good" as defined by
+    // our quality thresholds above
+    val filteredResults = moviePairSimilarities.filter(x => {
+      val (pair, (score, strength)) = x
+      pair.productIterator.contains(movieID) &&
+        score > scoreThreshold && strength > coOccurrenceThreshold
+    })
+
+    // Sort by quality score.
+    filteredResults.map(_.swap).sortByKey(false).take(10)
+  }
+
+  def printSimilarities(movieID: Int, mainMovieTitle: String, results: Array[(RatingSimilarity, MoviePair)]) = {
+    println(s"\nTop 10 similar movies for ${mainMovieTitle}")
+    for (result <- results) {
+      val ((score, strength), pair) = result
+      // Display the similarity result that isn't the movie we're looking at
+      val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
+      println(f"${similarMovieID}%5d ${movieTitle(similarMovieID)}%-40s    score: ${score * 100}%2f%%    strength: ${strength}")
+    }
   }
 
   object MoviePairRatingSimilarity {
