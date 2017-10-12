@@ -62,7 +62,7 @@ object MovieSimilarities extends App with Logging {
   }
 
   private def loadCachedMoviePairSimilarities(cacheFile: String): RDD[MoviePairRatingSimilarity] = {
-    logger.info("Loading cached movie similarities")
+    logger.info(s"Loading cached movie similarities from ${cacheFile}")
     sc.textFile(cacheFile).map(MoviePairRatingSimilarity.apply)
   }
 
@@ -73,12 +73,12 @@ object MovieSimilarities extends App with Logging {
     val moviePairSimilarities = ratings.join(ratings)
       .filter(filterDuplicates)
       .map(makePairs)
-      .partitionBy(new HashPartitioner(100))
       .groupByKey()
       .mapValues(computeCosineSimilarity)
 
     logger.debug(s"Caching movie similarities\n${moviePairSimilarities.toDebugString}")
     moviePairSimilarities.saveAsTextFile(cacheFile)
+    logger.debug(s"Movie similarities cached to ${cacheFile}")
 
     moviePairSimilarities.cache()
   }
