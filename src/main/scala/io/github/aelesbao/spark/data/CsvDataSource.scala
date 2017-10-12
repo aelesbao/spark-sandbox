@@ -14,19 +14,17 @@ object CsvDataSource extends Logging {
   codec.onMalformedInput(CodingErrorAction.REPLACE)
   codec.onUnmappableCharacter(CodingErrorAction.REPLACE)
 
-  def apply(dataSourcePath: String)(
-    implicit sc: SparkContext,
-    parseCsvLine: String => Array[String]
+  def apply(dataSourcePath: String, mapper: String => Array[String])(
+    implicit sc: SparkContext
   ): RDD[Array[String]] = {
     logger.debug(s"Loading data source '${dataSourcePath}' from resource path")
-    sc.textFile(s"data/${dataSourcePath}").map(parseCsvLine)
+    sc.textFile(s"data/${dataSourcePath}").map(mapper)
   }
 
-  def withHeader(dataSourcePath: String)(
-    implicit sc: SparkContext,
-    parseCsvLine: String => Array[String]
+  def withHeader(dataSourcePath: String, mapper: String => Array[String])(
+    implicit sc: SparkContext
   ): RDD[Map[String, String]] = {
-    val rdd = apply(dataSourcePath)
+    val rdd = apply(dataSourcePath, mapper)
 
     val headerLine = rdd.take(1)(0)
     val headerIndex = headerLine.zipWithIndex.toMap
