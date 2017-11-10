@@ -12,6 +12,9 @@ project/plugins/project/
 .cache
 .lib/
 
+# Development files
+.env
+
 # Apache Spark files
 /metastore_db
 derby.log
