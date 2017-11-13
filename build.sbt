@@ -8,5 +8,6 @@ lazy val root = (project in file(".")).
       version      := "0.1.0-SNAPSHOT"
     )),
     name := "spark-sandbox",
-    libraryDependencies ++= sparkDeps ++ loggingDeps ++ testingDeps
+    resolvers ++= customResolvers,
+    libraryDependencies ++= sparkDeps ++ dataSourceDependencies ++ loggingDeps ++ testingDeps
   )

@@ -25,3 +25,4 @@ derby.log
 
 # Cached RDDs
 /data/movie-similarities
+/data/zones.geojson
