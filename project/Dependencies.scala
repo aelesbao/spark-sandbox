@@ -7,8 +7,8 @@ object Dependencies {
 
   val sparkVersion = "2.2.0"
   val sparkDeps = Seq(
-    "org.apache.spark" %% "spark-core" % sparkVersion exclude("log4j", "log4j"),
-    "org.apache.spark" %% "spark-sql" % sparkVersion
+    "org.apache.spark" %% "spark-core" % sparkVersion % Provided exclude("log4j", "log4j"),
+    "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
   )
 
   val dataSourceDependencies = Seq(
