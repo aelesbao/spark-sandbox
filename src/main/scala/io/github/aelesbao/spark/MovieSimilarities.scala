@@ -1,6 +1,7 @@
 package io.github.aelesbao.spark
 
 import io.github.aelesbao.spark.data.MovieLensDataSource
+import io.github.aelesbao.spark.MovieSimilarities.MoviePairRatingSimilarity
 import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
@@ -27,14 +28,14 @@ object MovieSimilarities extends App with Logging {
   lazy val conf = new SparkConf()
     .setAppName(getClass.getName)
 
-  implicit lazy val sc = new SparkContext(conf)
+  implicit lazy val sc: SparkContext = new SparkContext(conf)
 
   lazy val movies = loadMovies()
-  def movieTitle = movies.lookup(_: Int)(0)
+  def movieTitle: Int => String = movies.lookup(_: Int).head
 
-  val movieID = args.lift(0).map(_.toInt).getOrElse(1)
+  val movieID = args.headOption.map(_.toInt).getOrElse(1)
   val mainMovieTitle = movieTitle(movieID)
-  logger.info(s"Calculating similarities for movie ${mainMovieTitle}")
+  logger.info(s"Calculating similarities for movie $mainMovieTitle")
 
   val scoreThreshold = args.lift(1).map(_.toDouble).getOrElse(0.97)
   val coOccurrenceThreshold = args.lift(2).map(_.toDouble).getOrElse(50.0)
@@ -62,7 +63,7 @@ object MovieSimilarities extends App with Logging {
   }
 
   private def loadCachedMoviePairSimilarities(cacheFile: String): RDD[MoviePairRatingSimilarity] = {
-    logger.info(s"Loading cached movie similarities from ${cacheFile}")
+    logger.info(s"Loading cached movie similarities from $cacheFile")
     sc.textFile(cacheFile).map(MoviePairRatingSimilarity.apply)
   }
 
@@ -78,7 +79,7 @@ object MovieSimilarities extends App with Logging {
 
     logger.debug(s"Caching movie similarities\n${moviePairSimilarities.toDebugString}")
     moviePairSimilarities.saveAsTextFile(cacheFile)
-    logger.debug(s"Movie similarities cached to ${cacheFile}")
+    logger.debug(s"Movie similarities cached to $cacheFile")
 
     moviePairSimilarities.cache()
   }
@@ -126,16 +127,16 @@ object MovieSimilarities extends App with Logging {
     })
 
     // Sort by quality score.
-    filteredResults.map(_.swap).sortByKey(false).take(10)
+    filteredResults.map(_.swap).sortByKey(ascending = false).take(10)
   }
 
-  def printSimilarities(movieID: Int, mainMovieTitle: String, results: Array[(RatingSimilarity, MoviePair)]) = {
-    println(s"\nTop 10 similar movies for ${mainMovieTitle}")
+  def printSimilarities(movieID: Int, mainMovieTitle: String, results: Array[(RatingSimilarity, MoviePair)]): Unit = {
+    println(s"\nTop 10 similar movies for $mainMovieTitle")
     for (result <- results) {
       val ((score, strength), pair) = result
       // Display the similarity result that isn't the movie we're looking at
       val similarMovieID = if (pair._1 == movieID) pair._2 else pair._1
-      println(f"${similarMovieID}%5d ${movieTitle(similarMovieID)}%-40s    score: ${score * 100}%2f%%    strength: ${strength}")
+      println(f"$similarMovieID%5d ${movieTitle(similarMovieID)}%-40s    score: ${score * 100}%2f%%    strength: $strength")
     }
   }
 
@@ -149,8 +150,8 @@ object MovieSimilarities extends App with Logging {
     object Parser extends JavaTokenParsers {
       override val skipWhitespace = false
 
-      def int = wholeNumber ^^ { _.toInt }
-      def decimal = decimalNumber ^^ { _.toDouble }
+      def int: MoviePairRatingSimilarity.Parser.Parser[Int] = wholeNumber ^^ { _.toInt }
+      def decimal: MoviePairRatingSimilarity.Parser.Parser[Double] = decimalNumber ^^ { _.toDouble }
 
       def moviePairTuple: Parser[MoviePair] =
         "(" ~> int ~ "," ~ int <~ ")" ^^ { case a ~ "," ~ b => a -> b }

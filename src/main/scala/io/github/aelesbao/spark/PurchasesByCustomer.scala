@@ -5,14 +5,14 @@ import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.SparkContext
 
 object PurchasesByCustomer extends App with Logging {
-  implicit val sc = new SparkContext("local[*]", getClass.getName)
+  implicit val sc: SparkContext = new SparkContext("local[*]", getClass.getName)
 
   logger.info("Calculating purchases by customer")
 
   val results = CsvDataSource("customer-orders.csv", _.split(","))
     .map(row => (row(0).toInt, BigDecimal(row(2))))
     .reduceByKey((a, b) => a + b)
-    .sortBy(_._2, false)
+    .sortBy(_._2, ascending = false)
     .collect()
 
   results.foreach(println)

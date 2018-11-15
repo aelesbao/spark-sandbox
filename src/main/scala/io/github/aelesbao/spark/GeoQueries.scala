@@ -28,8 +28,8 @@ object GeoQueries extends App with Logging {
     if (!Files.exists(Paths.get(path))) {
       val zonesGeoJSON = loadZonesFromDB()
       new PrintWriter(path) {
-        write(zonesGeoJSON);
-        close
+        write(zonesGeoJSON)
+        close()
       }
     }
   }
