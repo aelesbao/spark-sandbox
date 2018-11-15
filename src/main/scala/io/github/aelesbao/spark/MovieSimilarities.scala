@@ -1,17 +1,16 @@
 package io.github.aelesbao.spark
 
+import com.typesafe.scalalogging.LazyLogging
 import io.github.aelesbao.spark.data.MovieLensDataSource
-import io.github.aelesbao.spark.MovieSimilarities.MoviePairRatingSimilarity
-import org.apache.logging.log4j.scala.Logging
-import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.rdd.RDD
 
 import scala.math.sqrt
 import scala.reflect.io.Path
 import scala.util.Try
 import scala.util.parsing.combinator.JavaTokenParsers
 
-object MovieSimilarities extends App with Logging {
+object MovieSimilarities extends App with LazyLogging {
 
   type Movie = (Int, String)
 

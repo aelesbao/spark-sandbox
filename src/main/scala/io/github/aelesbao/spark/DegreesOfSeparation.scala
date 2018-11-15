@@ -1,14 +1,14 @@
 package io.github.aelesbao.spark
 
+import com.typesafe.scalalogging.LazyLogging
 import io.github.aelesbao.spark.data.MarvelDataSource
-import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 
 import scala.math.min
 
-object DegreesOfSeparation extends Logging {
+object DegreesOfSeparation extends LazyLogging {
   // Some custom data types
   // BFSData contains an array of hero ID connections, the distance, and color.
   type BFSData = (Array[Int], Int, Color.EnumVal)

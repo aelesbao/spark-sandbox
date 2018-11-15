@@ -2,13 +2,13 @@ package io.github.aelesbao.spark.data
 
 import java.nio.charset.CodingErrorAction
 
-import org.apache.logging.log4j.scala.Logging
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import scala.io.Codec
 
-object CsvDataSource extends Logging {
+object CsvDataSource extends LazyLogging {
   // Handle character encoding issues
   implicit val codec = Codec("UTF-8")
   codec.onMalformedInput(CodingErrorAction.REPLACE)

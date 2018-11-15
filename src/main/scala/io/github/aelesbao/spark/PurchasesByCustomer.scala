@@ -1,10 +1,10 @@
 package io.github.aelesbao.spark
 
+import com.typesafe.scalalogging.LazyLogging
 import io.github.aelesbao.spark.data.CsvDataSource
-import org.apache.logging.log4j.scala.Logging
 import org.apache.spark.SparkContext
 
-object PurchasesByCustomer extends App with Logging {
+object PurchasesByCustomer extends App with LazyLogging {
   implicit val sc: SparkContext = new SparkContext("local[*]", getClass.getName)
 
   logger.info("Calculating purchases by customer")

@@ -3,10 +3,10 @@ package io.github.aelesbao.spark
 import java.io.PrintWriter
 import java.nio.file.{Files, Paths}
 
-import org.apache.logging.log4j.scala.Logging
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.sql.SparkSession
 
-object GeoQueries extends App with Logging {
+object GeoQueries extends App with LazyLogging {
   val spark = SparkSession.builder
     .master("local[*]")
     .appName(getClass.getName)
